@@ -1,0 +1,25 @@
+========================================================= POLITIC ANDREI - BOGDAN =========================================================
+================================================================== 325CD ==================================================================
+
+================================================= DETALII DESPRE IMPLEMENTAREA TEMEI 3 PC =================================================
+
+	COMPILARE SI RULARE:
+
+>	make build
+>	make run {nume_domeniu} {tip_interogare}
+>	make clean
+
+	DESCRIERE:
+
+	Am implementat doar rezolvarea numelui de domeniu, nu si a ip-ului. Functiei solver i se paseaza parametrii dati la input (argv[1] este numele domeniului (ex. "example.com"), argv[2] este tipul de interogare (ex. "A")).
+	Am inceput prin a scrie in log-uri (in message.log si in dns.log) antetele output-urilor ("QUESTION..." sau "ANSWER..."), apoi valorile efective de output sunt scrise din functiile de interogare si raspuns.
+	Functia de interogare este toCharArray, care primeste  o structura de tip Query si are sarcina de a returna string-ul comprimat, cel care trebuie ulterior trimis catre serverul dns. Functia intoarce lungimea string-ului, care nu se poate obtine din strlen, deoarece contine caractere cu valoarea ascii 0, care nu se vor a fi null-terminatoare. Functia de raspuns este numita toAnswer, si primeste string-ul de query si lungimea acestuia. Are rolul de a transforma output-ul primit de la server intr-o structura de tip Answer, pe care o returneaza. De asemenea, in cele doua functii se si afiseaza output-ul corespunzator in dns.log, iar pentru afisare, ambele au nevoie de vectorul de argumente argv, ce contine numele domeniului si tipul interogarii.
+
+	Selectia tipului de interogare se face cu ajutorul functiei whichtype, care primeste string-ul ce contine tipul interogarii, intorcand valoarea constantei specifice, definite la inceputul programului.
+	Pachetul de tip Query pe care l-am initializat poarta numele de "packet". La inceput, ii atribui valorile pentru fiecare camp, facand conversia necesara pentru tipurile mai mare de 1 byte (ex. aplic functia htons pentru tipul unsigned short). In continuare, realizez o conexiune de tip UDP cu server-ul ales de mine (IP: 8.8.8.8), pe portul DNS-ului (53). Dupa stabilirea conexiunii, trimit serverului DNS buffer-ul obtinut in urma aplicarii functiei toCharArray. Ceea ce primesc de la server este pus in acelasi buffer, aceasta reprezentand input-ul trimis functiei toAnswer.
+
+
+	Descrierea principiului de functionare
+
+	Functia toCharArray primeste ca argumente, in afara de vectorul argv, structura initiala de tip Query si vectorul (cq) de tip unsigned char in care urmeaza sa se puna output-ul, care se va modifica dinamic. Incep prin a parsa header-ul in vectorul cq. Mai intai initializez campul ID cu un identificator intamplator. Deoarece este nevoie de a umple vectorul bit cu bit, in functie de valorile diferitelor campuri, utilizez operatii pe biti. Initializez elementele din vector cu valoarea 0 (adica toti bitii din byti sunt 0), apoi pentru fiecare bit fac "sau" intre bitul insusi si valoarea pe care trebuie sa o atribui bit-ului respectiv. Pozitia bit-ului o stabilesc inmultind valoarea atribuita cu o putere a lui 2, putere care indica pozitia de la dreapta la stanga in byte-ul respectiv din cq. Pentru countere (ultimii 4 unsigned short din header), realizez o simpla copiere de memorie la adresa specifica din vectorul cq. Continui prin a parsa question-ul in vectorul cq. Mai intai este nevoie de numele domeniului, scris in forma codificata (prin inlocuirea fiecarui punct "." cu lungimea numelui de domeniu care urmeaza). Acest lucru il fac despartind cu strtok numele dupa delimitatorul ".", iar de fiecare data cand obtin string-ul dintre puncte, ii salvez lungimea intr-un string pe care il concatenez la rezultat, inainte de a concatena numele urmator de domeniu. Atribuitea tipului si a clasei interogarii se face simplu prin copiere de memorie (memcpy) in vectorul cq.
+	Functia toAnswer primeste string-ul rezultat in urma interogarii (cel returnat de server), lungimea acestuia, si raspunsul de tip Answer pe care functia il va returna (si pe care il va scrie formatat in fisierul dns.log). Mai intai convertesc (inapoi) valorile counter-elor, din network-byte-order in host-byte-order (ntohs), apoi calculez offset-ul rezultat din primii 2 byti din structura Answer, "ignorand" primii doi biti de "1" (prin shiftare la stanga cu 2 biti, apoi shiftare inapoi la dreapta tot cu 2 biti). Conform structurii de tip header, lungimea numelui de domeniu este lungimea intregului vector parsat, minus 18. Intr-o structura for, iterand pe toate intrarile (in numar de ancount), realizez atribuirea in structura a fiecarui recording, primind in ordine pentru fiecare camp (type, class, ttl, rdlength, rdata) valorile in ordine din vector. Bytii pot fi parsati prin functiile sprintf urmata de atoi, dar am ales varianta inmultirii fiecarui byte cu 256 la puterea egala cu pozitia de la dreapta la stanga a byte-ului, in forma big-endian. Dupa parsare, fiecare camp din structura este afisat in dns.log.
